@@ -13,13 +13,19 @@ def _default_split(m:nn.Module): return (m[1],)
 # Split a resnet style model
 def _resnet_split(m:nn.Module): return (m[0][6],m[1])
 
-_default_meta = {'cut':-1, 'split':_default_split}
-_resnet_meta  = {'cut':-2, 'split':_resnet_split }
+def _squeezenet_body(m:nn.Module): return m.features
+def _squeezenet_split(m:nn.Module): return (m[1],)
+
+_default_meta = {'cut':-1, 'split':_default_split, 'mult': 1}
+_resnet_meta  = {'cut':-2, 'split':_resnet_split, 'mult': 2}
+_squeezenet_meta = {'cut':None,'split':_squeezenet_split, 'body_fn':_squeezenet_body, 'mult':4}
 
 model_meta = {
     models.resnet18 :{**_resnet_meta}, models.resnet34: {**_resnet_meta},
     models.resnet50 :{**_resnet_meta}, models.resnet101:{**_resnet_meta},
-    models.resnet152:{**_resnet_meta}}
+    models.resnet152:{**_resnet_meta},
+
+    models.squeezenet1_0:{**_squeezenet_meta}, models.squeezenet1_1:{**_squeezenet_meta}}
 
 def cnn_config(arch):
     torch.backends.cudnn.benchmark = True
@@ -59,8 +65,8 @@ def create_cnn(data:DataBunch, arch:Callable, cut:Union[int,Callable]=None, pret
     "Build convnet style learners."
     assert classification, 'Regression CNN not implemented yet, bug us on the forums if you want this!'
     meta = cnn_config(arch)
-    body = create_body(arch(pretrained), ifnone(cut,meta['cut']))
-    nf = num_features_model(body) * 2
+    body = create_body(arch(pretrained), ifnone(cut,meta['cut']), meta.get('body_fn'))
+    nf = num_features_model(body) * meta['mult']
     head = custom_head or create_head(nf, data.c, lin_ftrs, ps)
     model = nn.Sequential(body, head)
     learn = ClassificationLearner(data, model, **kwargs)

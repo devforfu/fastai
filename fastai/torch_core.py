@@ -126,7 +126,12 @@ def last_layer(m:nn.Module)->nn.Module:
 def num_features_model(m:nn.Module)->int:
     "Return the number of output features for a `model`."
     for l in reversed(flatten_model(m)):
-        if hasattr(l, 'num_features'): return l.num_features
+        if hasattr(l, 'num_features'):
+            # last layer is bn or linear
+            return l.num_features
+        elif hasattr(l, 'out_channels'):
+            # last layer is conv
+            return l.out_channels
 
 def split_model_idx(model:nn.Module, idxs:Collection[int])->ModuleList:
     "Split `model` according to the indices in `idxs`."
